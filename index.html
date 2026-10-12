@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MiniChat Real P2P</title>
+    <!-- Biblioteca PeerJS para conexão direta entre dispositivos reais -->
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+        body {
+            background-color: #121b22;
+            color: #e9edef;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .screen {
+            display: none;
+            flex: 1;
+            flex-direction: column;
+            height: 100%;
+            background-color: #111b21;
+        }
+        .screen.active {
+            display: flex;
+        }
+        header {
+            background-color: #202c33;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: #e9edef;
+            font-size: 1.1rem;
+            font-weight: 600;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            flex-shrink: 0;
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: #00a884;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: #fff;
+            overflow: hidden;
+            font-size: 1.1rem;
+            flex-shrink: 0;
+        }
+        .avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        #chat-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+        .chat-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            gap: 14px;
+            cursor: pointer;
+            border-bottom: 1px solid #222d34;
+        }
+        .chat-item:active {
+            background-color: #202c33;
+        }
+        .chat-info {
+            flex: 1;
+            overflow: hidden;
+        }
+        .chat-name {
+            font-weight: 600;
+            font-size: 1rem;
+            color: #e9edef;
+        }
+        .chat-last-msg {
+            font-size: 0.85rem;
+            color: #8696a0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-top: 3px;
+        }
+        #messages-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            background-color: #0b141a;
+        }
+        .message-bubble {
+            max-width: 75%;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            word-break: break-word;
+        }
+        .message-bubble.sent {
+            background-color: #005c4b;
+            align-self: flex-end;
+            border-top-right-radius: 0;
+        }
+        .message-bubble.received {
+            background-color: #202c33;
+            align-self: flex-start;
+            border-top-left-radius: 0;
+        }
+        .chat-input-bar {
+            background-color: #202c33;
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+        .chat-input-bar input {
+            flex: 1;
+            background-color: #2a3942;
+            border: none;
+            padding: 10px 14px;
+            border-radius: 8px;
+            color: white;
+            outline: none;
+            font-size: 1rem;
+        }
+        .btn-icon {
+            background: none;
+            border: none;
+            color: #00a884;
+            font-size: 1.2rem;
+            font-weight: bold;
+            cursor: pointer;
+            padding: 5px;
+        }
+        .my-id-box {
+            background-color: #202c33;
+            margin: 15px;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 0.9rem;
+            border: 1px dashed #00a884;
+        }
+        .my-id-box span {
+            color: #00a884;
+            font-weight: bold;
+            user-select: text;
+        }
+        .settings-form {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            align-items: center;
+        }
+        .settings-form input {
+            width: 100%;
+            padding: 12px;
+            background-color: #2a3942;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 1rem;
+            outline: none;
+        }
+        .settings-form button {
+            width: 100%;
+            padding: 12px;
+            background-color: #00a884;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        .profile-avatar-preview {
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            background-color: #00a884;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: white;
+            overflow: hidden;
+            border: 2px dashed #8696a0;
+        }
+        .profile-avatar-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .fab {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background-color: #00a884;
+            color: white;
+            width: 55px;
+            height: 55px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            border: none;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ECRÃ 1: LISTA DE CONVERSAS E SEU ID -->
+    <div id="screen-home" class="screen active">
+        <header>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <div class="avatar" id="my-header-avatar" onclick="switchScreen('screen-profile')" style="cursor: pointer;">U</div>
+                <span>MiniChat Real</span>
+            </div>
+            <button class="btn-icon" onclick="switchScreen('screen-profile')">⚙️</button>
+        </header>
+        
+        <div class="my-id-box">
+            O teu ID de Conexão: <span id="my-peer-id">A ligar à rede...</span><br>
+            <small style="color: #8696a0;">Partilha este ID com a pessoa real que vai falar contigo.</small>
+        </div>
+
+        <div id="chat-list">
+            <!-- Conversas ativas aparecem aqui -->
+        </div>
+
+        <button class="fab" onclick="adicionarContactoReal()">+</button>
+    </div>
+
+    <!-- ECRÃ 2: JANELA DE CHAT COM A PESSOA REAL -->
+    <div id="screen-chat" class="screen">
+        <header>
+            <div class="header-left">
+                <button class="btn-icon" onclick="switchScreen('screen-home')" style="color: #e9edef;">⬅</button>
+                <div class="avatar" id="active-chat-avatar">U</div>
+                <span id="active-chat-name">Nome</span>
+            </div>
+        </header>
+
+        <div id="messages-container"></div>
+
+        <div class="chat-input-bar">
+            <input type="text" id="msg-input" placeholder="Escreve uma mensagem...">
+            <button class="btn-icon" onclick="enviarMensagemReal()">➤</button>
+        </div>
+    </div>
+
+    <!-- ECRÃ 3: CONFIGURAR NOME E FOTO DE PERFIL -->
+    <div id="screen-profile" class="screen">
+        <header>
+            <div class="header-left">
+                <button class="btn-icon" onclick="switchScreen('screen-home')" style="color: #e9edef;">⬅</button>
+                <span>O Teu Perfil</span>
+            </div>
+        </header>
+
+        <div class="settings-form">
+            <div class="profile-avatar-preview" id="preview-avatar-box">
+                <span id="preview-initial">U</span>
+            </div>
+            <p style="font-size: 0.8rem; color: #8696a0; text-align: center;">Cole o link direto de uma imagem (URL) para a sua foto</p>
+            
+            <input type="text" id="input-my-name" placeholder="O teu nome">
+            <input type="text" id="input-my-avatar" placeholder="Link da foto (ex: https://...)">
+            
+            <button onclick="guardarPerfil()">Guardar e Atualizar</button>
+        </div>
+    </div>
+
+    <script>
+        let peer = null;
+        let myId = "";
+        let activeConnections = {}; // Guarda as conexões ativas por Peer ID
+
+        // Dados guardados localmente
+        let appData = JSON.parse(localStorage.getItem('real_p2p_chat')) || {
+            myProfile: { name: "Meu Utilizador", avatar: "" },
+            contacts: {} // ID_do_amigo -> { name, avatar, messages: [] }
+        };
+
+        let currentPeerId = null;
+
+        function initApp() {
+            carregarPerfilVisual();
+
+            // Iniciar PeerJS com servidor público gratuito
+            peer = new Peer();
+
+            peer.on('open', (id) => {
+                myId = id;
+                document.getElementById('my-peer-id').textContent = id;
+            });
+
+            // Quando alguém real se conecta ao nosso telemóvel
+            peer.on('connection', (conn) => {
+                configurarConexao(conn);
+            });
+        }
+
+        function guardarPerfil() {
+            appData.myProfile.name = document.getElementById('input-my-name').value.trim() || "Utilizador";
+            appData.myProfile.avatar = document.getElementById('input-my-avatar').value.trim();
+            localStorage.setItem('real_p2p_chat', JSON.stringify(appData));
+            carregarPerfilVisual();
+            alert("Perfil atualizado!");
+            switchScreen('screen-home');
+
+            // Enviar novo perfil para todos os contactos conectados atualmente
+            for (let peerId in activeConnections) {
+                enviarPacote(peerId, {
+                    type: 'profile_update',
+                    name: appData.myProfile.name,
+                    avatar: appData.myProfile.avatar
+                });
+            }
+        }
+
+        function carregarPerfilVisual() {
+            document.getElementById('input-my-name').value = appData.myProfile.name;
+            document.getElementById('input-my-avatar').value = appData.myProfile.avatar;
+
+            const headerAvatar = document.getElementById('my-header-avatar');
+            const previewBox = document.getElementById('preview-avatar-box');
+
+            if (appData.myProfile.avatar) {
+                headerAvatar.innerHTML = `<img src="${appData.myProfile.avatar}">`;
+                previewBox.innerHTML = `<img src="${appData.myProfile.avatar}">`;
+            } else {
+                const initial = appData.myProfile.name.charAt(0).toUpperCase();
+                headerAvatar.innerHTML = initial;
+                previewBox.innerHTML = `<span id="preview-initial">${initial}</span>`;
+            }
+        }
+
+        function configurarConexao(conn) {
+            activeConnections[conn.peer] = conn;
+
+            conn.on('open', () => {
+                // Assim que conecta, envia o nosso perfil atual para o amigo ver
+                enviarPacote(conn.peer, {
+                    type: 'profile_update',
+                    name: appData.myProfile.name,
+                    avatar: appData.myProfile.avatar
+                });
+            });
+
+            conn.on('data', (data) => {
+                processarPacoteRecebido(conn.peer, data);
+            });
+
+            conn.on('close', () => {
+                delete activeConnections[conn.peer];
+            });
+        }
+
+        function enviarPacote(peerId, pacote) {
+            if (activeConnections[peerId] && activeConnections[peerId].open) {
+                activeConnections[peerId].send(pacote);
+            }
+        }
+
+        function processarPacoteRecebido(peerId, pacote) {
+            if (!appData.contacts[peerId]) {
+                appData.contacts[peerId] = { name: "Amigo Real", avatar: "", messages: [] };
+            }
+
+            if (pacote.type === 'profile_update') {
+                appData.contacts[peerId].name = pacote.name;
+                appData.contacts[peerId].avatar = pacote.avatar;
+                salvarDados();
+                renderChatList();
+                if (currentPeerId === peerId) atualizarCabecalhoChat();
+            } 
+            else if (pacote.type === 'message') {
+                appData.contacts[peerId].messages.push({ sender: 'received', text: pacote.text });
+                salvarDados();
+                renderChatList();
+                if (document.getElementById('screen-chat').classList.contains('active') && currentPeerId === peerId) {
+                    renderMensagens();
+                }
+            }
+        }
+
+        function salvarDados() {
+            localStorage.setItem('real_p2p_chat', JSON.stringify(appData));
+        }
+
+        function switchScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+            if (screenId === 'screen-home') renderChatList();
+        }
+
+        function renderChatList() {
+            const listContainer = document.getElementById('chat-list');
+            listContainer.innerHTML = '';
+
+            const keys = Object.keys(appData.contacts);
+            if (keys.length === 0) {
+                listContainer.innerHTML = `<div style="text-align:center; color:#8696a0; margin-top:50px; padding: 0 20px;">Nenhum contacto adicionado.<br>Toque no botão <b>+</b> para inserir o ID de outra pessoa real.</div>`;
+                return;
+            }
+
+            keys.forEach(peerId => {
+                const contact = appData.contacts[peerId];
+                const lastMsg = contact.messages.length > 0 ? contact.messages[contact.messages.length - 1].text : 'Toque para conversar';
+
+                let avatarHTML = contact.name.charAt(0).toUpperCase();
+                if (contact.avatar) {
+                    avatarHTML = `<img src="${contact.avatar}">`;
+                }
+
+                const item = document.createElement('div');
+                item.className = 'chat-item';
+                item.onclick = () => abrirChat(peerId);
+
+                item.innerHTML = `
+                    <div class="avatar">${avatarHTML}</div>
+                    <div class="chat-info">
+                        <div class="chat-name">${contact.name}</div>
+                        <div class="chat-last-msg">${lastMsg}</div>
+                    </div>
+                `;
+                listContainer.appendChild(item);
+            });
+        }
+
+        function adicionarContactoReal() {
+            const friendId = prompt("Insira o ID de conexão da outra pessoa real:");
+            if (!friendId || friendId.trim() === "" || friendId === myId) return;
+
+            if (!appData.contacts[friendId]) {
+                appData.contacts[friendId] = { name: "Amigo (" + friendId.substring(0, 4) + ")", avatar: "", messages: [] };
+                salvarDados();
+            }
+
+            // Conectar ao Peer da outra pessoa
+            const conn = peer.connect(friendId);
+            configurarConexao(conn);
+            renderChatList();
+            abrirChat(friendId);
+        }
+
+        function abrirChat(peerId) {
+            currentPeerId = peerId;
+            if (!activeConnections[peerId]) {
+                const conn = peer.connect(peerId);
+                configurarConexao(conn);
+            }
+            atualizarCabecalhoChat();
+            renderMensagens();
+            switchScreen('screen-chat');
+        }
+
+        function atualizarCabecalhoChat() {
+            const contact = appData.contacts[currentPeerId];
+            if (!contact) return;
+
+            document.getElementById('active-chat-name').textContent = contact.name;
+            const avatarBox = document.getElementById('active-chat-avatar');
+            if (contact.avatar) {
+                avatarBox.innerHTML = `<img src="${contact.avatar}">`;
+            } else {
+                avatarBox.textContent = contact.name.charAt(0).toUpperCase();
+            }
+        }
+
+        function renderMensagens() {
+            const container = document.getElementById('messages-container');
+            container.innerHTML = '';
+
+            const contact = appData.contacts[currentPeerId];
+            if (!contact) return;
+
+            contact.messages.forEach(msg => {
+                const bubble = document.createElement('div');
+                bubble.className = `message-bubble ${msg.sender}`;
+                bubble.textContent = msg.text;
+                container.appendChild(bubble);
+            });
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function enviarMensagemReal() {
+            const input = document.getElementById('msg-input');
+            const texto = input.value.trim();
+            if (!texto || !currentPeerId) return;
+
+            // Enviar pacote de mensagem real pela internet para o outro telemóvel
+            enviarPacote(currentPeerId, {
+                type: 'message',
+                text: texto
+            });
+
+            // Guardar no histórico local
+            appData.contacts[currentPeerId].messages.push({ sender: 'sent', text: texto });
+            input.value = '';
+            salvarDados();
+            renderMensagens();
+            renderChatList();
+        }
+
+        document.getElementById('msg-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') enviarMensagemReal();
+        });
+
+        // Inicializar aplicação ao abrir
+        initApp();
+    </script>
+</body>
+</html>
